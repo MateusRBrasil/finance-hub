@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api, Grupo, CreateGrupoData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,17 +22,45 @@ export default function Grupos() {
   const [grupos, setGrupos] = useState<Grupo[]>(demoGrupos);
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<CreateGrupoData>({ nome: '', tipo: 'familia' });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchGrupos = async () => {
+      try {
+        const data = await api.getGrupos();
+        setGrupos(data);
+      } catch {
+        // Keep demo data
+      }
+    };
+    fetchGrupos();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const newGrupo = await api.createGrupo(formData);
       setGrupos([...grupos, newGrupo]);
       setIsOpen(false);
       setFormData({ nome: '', tipo: 'familia' });
       toast({ title: 'Grupo criado!' });
-    } catch { toast({ title: 'Erro', variant: 'destructive' }); }
+    } catch {
+      toast({ title: 'Erro ao criar grupo', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteGrupo(id);
+      setGrupos(grupos.filter(g => g.id !== id));
+      toast({ title: 'Grupo excluído' });
+    } catch {
+      toast({ title: 'Erro ao excluir', variant: 'destructive' });
+    }
   };
 
   return (
@@ -64,7 +92,7 @@ export default function Grupos() {
                   </Select>
                 </div>
               </div>
-              <DialogFooter><Button type="submit">Criar</Button></DialogFooter>
+              <DialogFooter><Button type="submit" disabled={isLoading}>{isLoading ? 'Criando...' : 'Criar'}</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -75,14 +103,24 @@ export default function Grupos() {
           return (
             <Card key={grupo.id}>
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <Icon className="h-5 w-5 text-primary" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{grupo.nome}</CardTitle>
+                      <CardDescription>{tipoLabels[grupo.tipo]}</CardDescription>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">{grupo.nome}</CardTitle>
-                    <CardDescription>{tipoLabels[grupo.tipo]}</CardDescription>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(grupo.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
             </Card>

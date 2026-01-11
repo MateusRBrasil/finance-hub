@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { api, Gasto } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Wallet,
   TrendingUp,
-  TrendingDown,
   Users,
   User,
   Plus,
@@ -22,18 +21,15 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 
 interface DashboardStats {
   total_gastos: number;
   gastos_pessoais: number;
   gastos_grupo: number;
-  por_categoria: { categoria: string; total: number }[];
-  por_grupo: { grupo: string; total: number }[];
-  ultimos_gastos: Gasto[];
+  total_mes_atual: number;
+  gastos_por_categoria: { categoria: string; valor: number }[];
+  gastos_por_mes: { mes: string; valor: number }[];
 }
 
 // Demo data for when API is not connected
@@ -41,66 +37,24 @@ const demoStats: DashboardStats = {
   total_gastos: 4580.50,
   gastos_pessoais: 1850.00,
   gastos_grupo: 2730.50,
-  por_categoria: [
-    { categoria: 'Alimentação', total: 1200 },
-    { categoria: 'Transporte', total: 850 },
-    { categoria: 'Lazer', total: 650 },
-    { categoria: 'Contas', total: 980 },
-    { categoria: 'Outros', total: 900.50 },
+  total_mes_atual: 1580.00,
+  gastos_por_categoria: [
+    { categoria: 'Alimentação', valor: 1200 },
+    { categoria: 'Transporte', valor: 850 },
+    { categoria: 'Lazer', valor: 650 },
+    { categoria: 'Contas', valor: 980 },
+    { categoria: 'Outros', valor: 900.50 },
   ],
-  por_grupo: [
-    { grupo: 'Família', total: 1500 },
-    { grupo: 'Viagem SP', total: 730.50 },
-    { grupo: 'Churras', total: 500 },
-  ],
-  ultimos_gastos: [
-    {
-      id: '1',
-      tenant_id: '1',
-      user_id: '1',
-      grupo_id: null,
-      categoria_id: '1',
-      valor: 150.00,
-      data: new Date().toISOString(),
-      descricao: 'Supermercado',
-      created_at: new Date().toISOString(),
-      categoria_nome: 'Alimentação',
-    },
-    {
-      id: '2',
-      tenant_id: '1',
-      user_id: '1',
-      grupo_id: '1',
-      categoria_id: '2',
-      valor: 85.00,
-      data: new Date().toISOString(),
-      descricao: 'Uber para reunião',
-      created_at: new Date().toISOString(),
-      categoria_nome: 'Transporte',
-      grupo_nome: 'Família',
-    },
-    {
-      id: '3',
-      tenant_id: '1',
-      user_id: '1',
-      grupo_id: null,
-      categoria_id: '3',
-      valor: 250.00,
-      data: new Date().toISOString(),
-      descricao: 'Cinema e jantar',
-      created_at: new Date().toISOString(),
-      categoria_nome: 'Lazer',
-    },
+  gastos_por_mes: [
+    { mes: 'Ago', valor: 2100 },
+    { mes: 'Set', valor: 1800 },
+    { mes: 'Out', valor: 2300 },
+    { mes: 'Nov', valor: 1950 },
+    { mes: 'Dez', valor: 2500 },
+    { mes: 'Jan', valor: 1580 },
   ],
 };
 
-const CHART_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-];
 
 export default function Dashboard() {
   const { currentTenant, user } = useAuth();
@@ -210,15 +164,17 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Categorias
+              Mês Atual
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {stats.por_categoria.length}
+              {formatCurrency(stats.total_mes_atual)}
             </div>
-            <p className="text-xs text-muted-foreground">Categorias ativas</p>
+            <p className="text-xs text-muted-foreground">
+              {stats.gastos_por_categoria.length} categorias
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -234,7 +190,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.por_categoria} layout="vertical">
+                <BarChart data={stats.gastos_por_categoria} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" tickFormatter={(v) => `R$${v}`} />
                   <YAxis type="category" dataKey="categoria" width={100} />
@@ -246,39 +202,26 @@ export default function Dashboard() {
                       borderRadius: 'var(--radius)',
                     }}
                   />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Pie Chart - Por Grupo */}
+        {/* Line Chart - Por Mês */}
         <Card>
           <CardHeader>
-            <CardTitle>Gastos por Grupo</CardTitle>
-            <CardDescription>Divisão entre grupos</CardDescription>
+            <CardTitle>Gastos por Mês</CardTitle>
+            <CardDescription>Evolução dos últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.por_grupo}
-                    dataKey="total"
-                    nameKey="grupo"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={({ grupo, percent }) => `${grupo} (${(percent * 100).toFixed(0)}%)`}
-                  >
-                    {stats.por_grupo.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
+                <BarChart data={stats.gastos_por_mes}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="mes" />
+                  <YAxis tickFormatter={(v) => `R$${v}`} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -287,68 +230,63 @@ export default function Dashboard() {
                       borderRadius: 'var(--radius)',
                     }}
                   />
-                </PieChart>
+                  <Bar dataKey="valor" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Expenses */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Últimos Gastos</CardTitle>
-            <CardDescription>Transações recentes do tenant</CardDescription>
-          </div>
-          <Link to="/gastos">
-            <Button variant="outline" size="sm">
-              Ver todos
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {stats.ultimos_gastos.map((gasto) => (
-              <div
-                key={gasto.id}
-                className="flex items-center justify-between rounded-lg border border-border p-4"
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      gasto.grupo_id
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-secondary text-secondary-foreground'
-                    }`}
-                  >
-                    {gasto.grupo_id ? (
-                      <Users className="h-5 w-5" />
-                    ) : (
-                      <User className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{gasto.descricao}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {gasto.categoria_nome}
-                      {gasto.grupo_nome && ` • ${gasto.grupo_nome}`}
-                    </p>
-                  </div>
+      {/* Summary Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Resumo por Categoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.gastos_por_categoria.slice(0, 5).map((item, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">{item.categoria}</span>
+                  <span className="font-medium">{formatCurrency(item.valor)}</span>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-foreground">
-                    {formatCurrency(gasto.valor)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(gasto.data).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+              {stats.gastos_por_categoria.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum gasto registrado
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Link to="/gastos" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Plus className="h-4 w-4" />
+                Registrar Gasto
+              </Button>
+            </Link>
+            <Link to="/grupos" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Users className="h-4 w-4" />
+                Gerenciar Grupos
+              </Button>
+            </Link>
+            <Link to="/categorias" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Ver Categorias
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Demo Notice */}
       {!currentTenant && (

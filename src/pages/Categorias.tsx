@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api, Categoria, CreateCategoriaData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,17 +21,45 @@ export default function Categorias() {
   const [categorias, setCategorias] = useState<Categoria[]>(demoCategorias);
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<CreateCategoriaData>({ nome: '', tipo: 'despesa' });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchCategorias = async () => {
+      try {
+        const data = await api.getCategorias();
+        setCategorias(data);
+      } catch {
+        // Keep demo data
+      }
+    };
+    fetchCategorias();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const newCat = await api.createCategoria(formData);
       setCategorias([...categorias, newCat]);
       setIsOpen(false);
       setFormData({ nome: '', tipo: 'despesa' });
       toast({ title: 'Categoria criada!' });
-    } catch { toast({ title: 'Erro', variant: 'destructive' }); }
+    } catch {
+      toast({ title: 'Erro ao criar categoria', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteCategoria(id);
+      setCategorias(categorias.filter(c => c.id !== id));
+      toast({ title: 'Categoria excluída' });
+    } catch {
+      toast({ title: 'Erro ao excluir', variant: 'destructive' });
+    }
   };
 
   return (
@@ -62,22 +90,32 @@ export default function Categorias() {
                   </Select>
                 </div>
               </div>
-              <DialogFooter><Button type="submit">Criar</Button></DialogFooter>
+              <DialogFooter><Button type="submit" disabled={isLoading}>{isLoading ? 'Criando...' : 'Criar'}</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {categorias.map((cat) => (
-          <Card key={cat.id} className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardContent className="flex items-center gap-3 py-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Tags className="h-5 w-5 text-primary" />
+          <Card key={cat.id} className="transition-shadow hover:shadow-md">
+            <CardContent className="flex items-center justify-between gap-3 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Tags className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{cat.nome}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{cat.tipo}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-foreground">{cat.nome}</p>
-                <p className="text-sm text-muted-foreground capitalize">{cat.tipo}</p>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => handleDelete(cat.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </CardContent>
           </Card>
         ))}
