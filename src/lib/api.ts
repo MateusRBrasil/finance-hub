@@ -211,14 +211,15 @@ class ApiService {
     });
   }
 
-  async joinTenant(tenantId: string): Promise<TenantUser> {
-    return this.request<TenantUser>(`/tenants/${tenantId}/join`, {
+  async joinTenant(tenantId: string): Promise<Tenant> {
+    return this.request<Tenant>('/tenants/join', {
       method: 'POST',
+      body: JSON.stringify({ tenant_id: tenantId }),
     });
   }
 
-  async getTenantUsers(): Promise<(TenantUser & { user: User })[]> {
-    return this.request<(TenantUser & { user: User })[]>('/tenants/users');
+  async getTenantUsers(tenantId: string): Promise<TenantUser[]> {
+    return this.request<TenantUser[]>(`/tenants/${tenantId}/users`);
   }
 
   // Grupos
@@ -285,9 +286,9 @@ class ApiService {
     total_gastos: number;
     gastos_pessoais: number;
     gastos_grupo: number;
-    por_categoria: { categoria: string; total: number }[];
-    por_grupo: { grupo: string; total: number }[];
-    ultimos_gastos: Gasto[];
+    total_mes_atual: number;
+    gastos_por_categoria: { categoria: string; valor: number }[];
+    gastos_por_mes: { mes: string; valor: number }[];
   }> {
     return this.request('/dashboard/stats');
   }
