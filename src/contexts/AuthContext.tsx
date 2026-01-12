@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api, User, Tenant, AuthResponse } from '@/lib/api';
+import { api, User, Tenant } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -8,7 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (nome: string, email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string, tenantName?: string) => Promise<void>;
   logout: () => void;
   selectTenant: (tenant: Tenant) => void;
   refreshTenants: () => Promise<void>;
@@ -58,14 +58,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshTenants]);
 
   const login = async (email: string, password: string) => {
-    const response: AuthResponse = await api.login({ email, password });
-    setUser(response.user);
+    // OAuth2 expects 'username' field, we use email as username
+    await api.login({ username: email, password });
+    // Fetch user data after successful login
+    const userData = await api.getCurrentUser();
+    setUser(userData);
     await refreshTenants();
   };
 
-  const register = async (nome: string, email: string, password: string) => {
-    const response: AuthResponse = await api.register({ nome, email, password });
-    setUser(response.user);
+  const register = async (fullName: string, email: string, password: string, tenantName?: string) => {
+    await api.register({ 
+      email, 
+      password, 
+      full_name: fullName,
+      tenant_name: tenantName || `Tenant de ${fullName}`
+    });
+    // Fetch user data after successful registration
+    const userData = await api.getCurrentUser();
+    setUser(userData);
     await refreshTenants();
   };
 

@@ -59,20 +59,20 @@ export interface Gasto {
 }
 
 export interface LoginCredentials {
-  email: string;
+  username: string; // OAuth2 expects 'username' field
   password: string;
 }
 
 export interface RegisterData {
-  nome: string;
   email: string;
   password: string;
+  full_name: string;
+  tenant_name: string;
 }
 
 export interface AuthResponse {
   access_token: string;
   token_type: string;
-  user: User;
 }
 
 export interface CreateGastoData {
@@ -171,14 +171,30 @@ class ApiService {
     return !!this.token;
   }
 
-  // Authentication
+  // Authentication - OAuth2 Password Flow
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/login', {
+    // OAuth2 expects form-urlencoded data
+    const formData = new URLSearchParams();
+    formData.append('username', credentials.username);
+    formData.append('password', credentials.password);
+
+    const url = `${API_BASE_URL}/auth/login`;
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify(credentials),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
     });
-    this.setToken(response.access_token);
-    return response;
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Falha no login' }));
+      throw new Error(error.detail || 'Falha no login');
+    }
+
+    const data: AuthResponse = await response.json();
+    this.setToken(data.access_token);
+    return data;
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {

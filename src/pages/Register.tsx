@@ -5,14 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Wallet, Mail, Lock, User, Building2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Register() {
-  const [nome, setNome] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [tenantName, setTenantName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const { register } = useAuth();
@@ -33,15 +34,20 @@ export default function Register() {
       return;
     }
 
+    if (fullName.trim().length < 2) {
+      setError('Nome deve ter pelo menos 2 caracteres');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await register(nome, email, password);
+      await register(fullName, email, password, tenantName || undefined);
       toast({
         title: 'Conta criada!',
-        description: 'Bem-vindo ao FinGroup. Vamos configurar seu primeiro tenant.',
+        description: 'Bem-vindo ao FinGroup. Seu tenant foi configurado automaticamente.',
       });
-      navigate('/tenants');
+      navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta');
     } finally {
@@ -78,17 +84,19 @@ export default function Register() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="nome">Nome</Label>
+                <Label htmlFor="fullName">Nome Completo</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    id="nome"
+                    id="fullName"
                     type="text"
-                    placeholder="Seu nome"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Seu nome completo"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     className="pl-10"
                     required
+                    minLength={2}
+                    maxLength={100}
                   />
                 </div>
               </div>
@@ -105,8 +113,28 @@ export default function Register() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
                     required
+                    maxLength={255}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tenantName">Nome do Tenant (Organização)</Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="tenantName"
+                    type="text"
+                    placeholder="Ex: Minha Família, Empresa XYZ"
+                    value={tenantName}
+                    onChange={(e) => setTenantName(e.target.value)}
+                    className="pl-10"
+                    maxLength={100}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deixe em branco para criar automaticamente
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -121,6 +149,7 @@ export default function Register() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
                     required
+                    minLength={6}
                   />
                 </div>
               </div>
@@ -137,6 +166,7 @@ export default function Register() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10"
                     required
+                    minLength={6}
                   />
                 </div>
               </div>
