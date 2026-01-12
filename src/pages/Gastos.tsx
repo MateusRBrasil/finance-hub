@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -36,52 +36,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, MoreHorizontal, Trash2, Edit, Users, User, Filter, Search } from 'lucide-react';
+import { Plus, MoreHorizontal, Trash2, Edit, Users, User, Filter, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-// Demo data
-const demoCategorias: Categoria[] = [
-  { id: '1', tenant_id: '1', nome: 'Alimentação', tipo: 'despesa' },
-  { id: '2', tenant_id: '1', nome: 'Transporte', tipo: 'despesa' },
-  { id: '3', tenant_id: '1', nome: 'Lazer', tipo: 'despesa' },
-  { id: '4', tenant_id: '1', nome: 'Contas', tipo: 'despesa' },
-];
-
-const demoGrupos: Grupo[] = [
-  { id: '1', tenant_id: '1', nome: 'Família', tipo: 'familia', created_at: new Date().toISOString() },
-  { id: '2', tenant_id: '1', nome: 'Viagem SP', tipo: 'viagem', created_at: new Date().toISOString() },
-];
-
-const demoGastos: Gasto[] = [
-  {
-    id: '1', tenant_id: '1', user_id: '1', grupo_id: null, categoria_id: '1',
-    valor: 150.00, data: new Date().toISOString(), descricao: 'Supermercado',
-    created_at: new Date().toISOString(), categoria_nome: 'Alimentação'
-  },
-  {
-    id: '2', tenant_id: '1', user_id: '1', grupo_id: '1', categoria_id: '2',
-    valor: 85.00, data: new Date().toISOString(), descricao: 'Uber para reunião',
-    created_at: new Date().toISOString(), categoria_nome: 'Transporte', grupo_nome: 'Família'
-  },
-  {
-    id: '3', tenant_id: '1', user_id: '1', grupo_id: null, categoria_id: '3',
-    valor: 250.00, data: new Date().toISOString(), descricao: 'Cinema e jantar',
-    created_at: new Date().toISOString(), categoria_nome: 'Lazer'
-  },
-  {
-    id: '4', tenant_id: '1', user_id: '1', grupo_id: '2', categoria_id: '1',
-    valor: 320.00, data: new Date().toISOString(), descricao: 'Restaurante em grupo',
-    created_at: new Date().toISOString(), categoria_nome: 'Alimentação', grupo_nome: 'Viagem SP'
-  },
-];
 
 export default function Gastos() {
   const { currentTenant } = useAuth();
-  const [gastos, setGastos] = useState<Gasto[]>(demoGastos);
-  const [categorias, setCategorias] = useState<Categoria[]>(demoCategorias);
-  const [grupos, setGrupos] = useState<Grupo[]>(demoGrupos);
+  const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGrupo, setFilterGrupo] = useState<string>('all');
   const [filterCategoria, setFilterCategoria] = useState<string>('all');
@@ -98,8 +63,12 @@ export default function Gastos() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!currentTenant) return;
+      if (!currentTenant) {
+        setIsLoadingData(false);
+        return;
+      }
       
+      setIsLoadingData(true);
       try {
         const [gastosData, categoriasData, gruposData] = await Promise.all([
           api.getGastos(),
@@ -110,19 +79,40 @@ export default function Gastos() {
         setCategorias(categoriasData);
         setGrupos(gruposData);
       } catch (error) {
-        // Keep demo data
+        toast({
+          title: 'Erro ao carregar dados',
+          description: error instanceof Error ? error.message : 'Erro de conexão com o servidor',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingData(false);
       }
     };
 
     fetchData();
-  }, [currentTenant]);
+  }, [currentTenant, toast]);
 
   const handleCreateGasto = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.categoria_id) {
+      toast({ title: 'Selecione uma categoria', variant: 'destructive' });
+      return;
+    }
+    
+    if (formData.valor <= 0) {
+      toast({ title: 'Informe um valor válido', variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const newGasto = await api.createGasto(formData);
+      const newGasto = await api.createGasto({
+        ...formData,
+        valor: Number(formData.valor),
+        grupo_id: formData.grupo_id || null,
+      });
       setGastos([newGasto, ...gastos]);
       setIsCreateOpen(false);
       setFormData({
@@ -173,6 +163,14 @@ export default function Gastos() {
 
   const totalFiltered = filteredGastos.reduce((sum, g) => sum + g.valor, 0);
 
+  if (!currentTenant) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-muted-foreground">Selecione um tenant para ver os gastos</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -186,7 +184,7 @@ export default function Gastos() {
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" disabled={categorias.length === 0}>
               <Plus className="h-4 w-4" />
               Novo Gasto
             </Button>
@@ -208,6 +206,7 @@ export default function Gastos() {
                     value={formData.descricao}
                     onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                     required
+                    maxLength={500}
                   />
                 </div>
                 
@@ -218,7 +217,7 @@ export default function Gastos() {
                       id="valor"
                       type="number"
                       step="0.01"
-                      min="0"
+                      min="0.01"
                       placeholder="0,00"
                       value={formData.valor || ''}
                       onChange={(e) => setFormData({ ...formData, valor: parseFloat(e.target.value) || 0 })}
@@ -356,79 +355,98 @@ export default function Gastos() {
       {/* Table */}
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGastos.length === 0 ? (
+          {isLoadingData ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    Nenhum gasto encontrado
-                  </TableCell>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
-              ) : (
-                filteredGastos.map((gasto) => (
-                  <TableRow key={gasto.id}>
-                    <TableCell className="font-medium">{gasto.descricao}</TableCell>
-                    <TableCell>{gasto.categoria_nome}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {gasto.grupo_id ? (
-                          <>
-                            <Users className="h-4 w-4 text-primary" />
-                            <span className="text-sm">{gasto.grupo_nome}</span>
-                          </>
-                        ) : (
-                          <>
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Pessoal</span>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(gasto.data).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(gasto.valor)}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteGasto(gasto.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              </TableHeader>
+              <TableBody>
+                {filteredGastos.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      {gastos.length === 0 
+                        ? 'Nenhum gasto registrado. Clique em "Novo Gasto" para começar.'
+                        : 'Nenhum gasto encontrado com os filtros aplicados'}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredGastos.map((gasto) => (
+                    <TableRow key={gasto.id}>
+                      <TableCell className="font-medium">{gasto.descricao}</TableCell>
+                      <TableCell>{gasto.categoria_nome || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {gasto.grupo_id ? (
+                            <>
+                              <Users className="h-4 w-4 text-primary" />
+                              <span className="text-sm">{gasto.grupo_nome || 'Grupo'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Pessoal</span>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(gasto.data).toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(gasto.valor)}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteGasto(gasto.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      {/* Notice when no categories */}
+      {categorias.length === 0 && !isLoadingData && (
+        <Card className="border-dashed border-primary/50 bg-primary/5">
+          <CardContent className="py-4 text-center">
+            <p className="text-muted-foreground">
+              Crie categorias primeiro para poder registrar gastos.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

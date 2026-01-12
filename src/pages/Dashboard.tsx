@@ -11,6 +11,7 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -32,49 +33,38 @@ interface DashboardStats {
   gastos_por_mes: { mes: string; valor: number }[];
 }
 
-// Demo data for when API is not connected
-const demoStats: DashboardStats = {
-  total_gastos: 4580.50,
-  gastos_pessoais: 1850.00,
-  gastos_grupo: 2730.50,
-  total_mes_atual: 1580.00,
-  gastos_por_categoria: [
-    { categoria: 'Alimentação', valor: 1200 },
-    { categoria: 'Transporte', valor: 850 },
-    { categoria: 'Lazer', valor: 650 },
-    { categoria: 'Contas', valor: 980 },
-    { categoria: 'Outros', valor: 900.50 },
-  ],
-  gastos_por_mes: [
-    { mes: 'Ago', valor: 2100 },
-    { mes: 'Set', valor: 1800 },
-    { mes: 'Out', valor: 2300 },
-    { mes: 'Nov', valor: 1950 },
-    { mes: 'Dez', valor: 2500 },
-    { mes: 'Jan', valor: 1580 },
-  ],
+const emptyStats: DashboardStats = {
+  total_gastos: 0,
+  gastos_pessoais: 0,
+  gastos_grupo: 0,
+  total_mes_atual: 0,
+  gastos_por_categoria: [],
+  gastos_por_mes: [],
 };
 
-
 export default function Dashboard() {
-  const { currentTenant, user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>(demoStats);
+  const { currentTenant } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>(emptyStats);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
       if (!currentTenant) {
-        setStats(demoStats);
+        setStats(emptyStats);
         setIsLoading(false);
         return;
       }
 
+      setIsLoading(true);
+      setError(null);
+      
       try {
         const data = await api.getDashboardStats();
         setStats(data);
-      } catch (error) {
-        // Use demo data if API fails
-        setStats(demoStats);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar estatísticas');
+        setStats(emptyStats);
       } finally {
         setIsLoading(false);
       }
@@ -90,6 +80,34 @@ export default function Dashboard() {
     }).format(value);
   };
 
+  const calculatePercentage = (part: number, total: number) => {
+    if (total === 0) return 0;
+    return ((part / total) * 100).toFixed(0);
+  };
+
+  if (!currentTenant) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-lg font-semibold text-foreground">Selecione um Tenant</h2>
+        <p className="text-muted-foreground text-center max-w-md mt-2">
+          Escolha ou crie um tenant para visualizar o dashboard de finanças.
+        </p>
+        <Link to="/tenants" className="mt-4">
+          <Button>Gerenciar Tenants</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -97,7 +115,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
-            {currentTenant ? `Visão geral de ${currentTenant.nome}` : 'Selecione um tenant para começar'}
+            Visão geral de {currentTenant.nome}
           </p>
         </div>
         <Link to="/gastos">
@@ -107,6 +125,15 @@ export default function Dashboard() {
           </Button>
         </Link>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="py-4">
+            <p className="text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -121,7 +148,7 @@ export default function Dashboard() {
             <div className="text-2xl font-bold text-foreground">
               {formatCurrency(stats.total_gastos)}
             </div>
-            <p className="text-xs text-muted-foreground">Este mês</p>
+            <p className="text-xs text-muted-foreground">Todos os períodos</p>
           </CardContent>
         </Card>
 
@@ -138,7 +165,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center text-xs text-muted-foreground">
               <ArrowDownRight className="mr-1 h-3 w-3 text-destructive" />
-              {((stats.gastos_pessoais / stats.total_gastos) * 100).toFixed(0)}% do total
+              {calculatePercentage(stats.gastos_pessoais, stats.total_gastos)}% do total
             </div>
           </CardContent>
         </Card>
@@ -156,7 +183,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center text-xs text-muted-foreground">
               <ArrowUpRight className="mr-1 h-3 w-3 text-primary" />
-              {((stats.gastos_grupo / stats.total_gastos) * 100).toFixed(0)}% do total
+              {calculatePercentage(stats.gastos_grupo, stats.total_gastos)}% do total
             </div>
           </CardContent>
         </Card>
@@ -173,7 +200,7 @@ export default function Dashboard() {
               {formatCurrency(stats.total_mes_atual)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats.gastos_por_categoria.length} categorias
+              {stats.gastos_por_categoria.length} categoria(s)
             </p>
           </CardContent>
         </Card>
@@ -189,50 +216,62 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.gastos_por_categoria} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                  <XAxis type="number" tickFormatter={(v) => `R$${v}`} />
-                  <YAxis type="category" dataKey="categoria" width={100} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  />
-                  <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {stats.gastos_por_categoria.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Nenhum gasto registrado
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.gastos_por_categoria} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" tickFormatter={(v) => `R$${v}`} />
+                    <YAxis type="category" dataKey="categoria" width={100} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Line Chart - Por Mês */}
+        {/* Bar Chart - Por Mês */}
         <Card>
           <CardHeader>
             <CardTitle>Gastos por Mês</CardTitle>
-            <CardDescription>Evolução dos últimos 6 meses</CardDescription>
+            <CardDescription>Evolução dos últimos meses</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.gastos_por_mes}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="mes" />
-                  <YAxis tickFormatter={(v) => `R$${v}`} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  />
-                  <Bar dataKey="valor" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {stats.gastos_por_mes.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Nenhum histórico disponível
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.gastos_por_mes}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" />
+                    <YAxis tickFormatter={(v) => `R$${v}`} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Bar dataKey="valor" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -246,16 +285,17 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats.gastos_por_categoria.slice(0, 5).map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{item.categoria}</span>
-                  <span className="font-medium">{formatCurrency(item.valor)}</span>
-                </div>
-              ))}
-              {stats.gastos_por_categoria.length === 0 && (
+              {stats.gastos_por_categoria.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhum gasto registrado
                 </p>
+              ) : (
+                stats.gastos_por_categoria.slice(0, 5).map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{item.categoria}</span>
+                    <span className="font-medium">{formatCurrency(item.valor)}</span>
+                  </div>
+                ))
               )}
             </div>
           </CardContent>
@@ -287,23 +327,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Demo Notice */}
-      {!currentTenant && (
-        <Card className="border-dashed border-primary/50 bg-primary/5">
-          <CardContent className="flex items-center gap-4 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <TrendingUp className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-foreground">Modo Demonstração</p>
-              <p className="text-sm text-muted-foreground">
-                Os dados exibidos são de exemplo. Conecte sua API FastAPI para ver dados reais.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
