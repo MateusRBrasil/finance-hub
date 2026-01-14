@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +17,11 @@ import Categorias from "./pages/Categorias";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Force dark mode on load
+if (typeof document !== 'undefined') {
+  document.documentElement.classList.add('dark');
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
