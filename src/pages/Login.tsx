@@ -110,12 +110,6 @@ export default function Login() {
           </form>
         </Card>
 
-        {/* Demo notice */}
-        <div className="mt-6 rounded-lg border border-border bg-card p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            <strong>Modo Demo:</strong> Configure VITE_API_URL para conectar ao backend FastAPI
-          </p>
-        </div>
       </div>
     </div>
   );
