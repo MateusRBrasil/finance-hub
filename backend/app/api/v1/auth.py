@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
 from app.models.user import User
+from app.models.tenant import Tenant, TenantUser, RoleEnum
 from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
 
 router = APIRouter()
 
 @router.post("/register", response_model=Token)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user"""
+    """Register a new user with a tenant"""
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
@@ -24,11 +25,27 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     
     # Create new user
     user = User(
-        nome=user_data.nome,
+        nome=user_data.full_name,
         email=user_data.email,
         password_hash=get_password_hash(user_data.password)
     )
     db.add(user)
+    db.flush()  # Get user ID before committing
+    
+    # Create tenant for the user
+    tenant = Tenant(
+        nome=user_data.tenant_name
+    )
+    db.add(tenant)
+    db.flush()  # Get tenant ID
+    
+    # Associate user with tenant as owner
+    tenant_user = TenantUser(
+        tenant_id=tenant.id,
+        user_id=user.id,
+        role=RoleEnum.owner
+    )
+    db.add(tenant_user)
     db.commit()
     db.refresh(user)
     
