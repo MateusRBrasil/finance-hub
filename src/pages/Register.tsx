@@ -49,7 +49,13 @@ export default function Register() {
       });
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar conta';
+      // Check if it's a network error (backend not running)
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        setError('Não foi possível conectar ao servidor. Certifique-se de que o backend está rodando em localhost:8000');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
