@@ -6,9 +6,10 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 class UserCreate(BaseModel):
-    nome: str
     email: EmailStr
     password: str
+    full_name: str
+    tenant_name: str
 
 class UserLogin(BaseModel):
     email: EmailStr
